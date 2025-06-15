@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  Checkbox,
   IconButton,
   Paper,
   Table,
@@ -27,14 +28,15 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import api from "../../api/axiosInstance";
 import { Employee } from "../../type/types";
 
-
-
 const EmployeeTable = () => {
   const [data, setData] = useState<Employee[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalElements, setTotalElements] = useState(0);
   const [search, setSearch] = useState("");
+
+  // 新增選擇多筆 id 狀態
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -58,11 +60,8 @@ const EmployeeTable = () => {
 
   useEffect(() => {
     getData();
-  }, [page, rowsPerPage]);
-  
-  useEffect(() => {
-    getData();
-  }, [search]);
+    setSelectedIds([]); // 頁面改變或搜尋時清除勾選
+  }, [page, rowsPerPage, search]);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -74,16 +73,54 @@ const EmployeeTable = () => {
   };
 
   const handleDelete = async (id: number) => {
-    // const updatedData = data.filter((row) => row.id !== id);
-    const response = await api.delete(`/employee/delete/${id}`);
-    if (response.status === 200) {
-      console.log("刪除員工資料成功:", response.data);
-      getData();
-      // setData(updatedData);
-      alert("刪除員工資料成功");
+    if (!window.confirm("確定刪除此員工資料嗎？")) return;
+    try {
+      const response = await api.delete(`/employee/delete/${id}`);
+      if (response.status === 200) {
+        alert("刪除員工資料成功");
+        getData();
+      }
+    } catch (err) {
+      console.error("刪除員工資料失敗:", err);
+      alert("刪除失敗，請稍後再試");
+    }
+  };
+
+  // 勾選全部
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const allIds = data.map((row) => row.id);
+      setSelectedIds(allIds);
     } else {
-      console.error("刪除員工資料失敗:", response.data);
-      alert("刪除員工資料失敗");
+      setSelectedIds([]);
+    }
+  };
+
+  // 勾選單筆
+  const handleSelectOne = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // 批量刪除
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`確定刪除 ${selectedIds.length} 筆員工資料嗎？`)) return;
+
+    try {
+      // axios delete 傳 body 用 data 欄位
+      const response = await api.delete("/employee/deleteBatch", {
+        data: selectedIds,
+      });
+      if (response.status === 200) {
+        alert("批量刪除成功");
+        setSelectedIds([]);
+        getData();
+      }
+    } catch (err) {
+      console.error("批量刪除失敗:", err);
+      alert("刪除失敗，請稍後再試");
     }
   };
 
@@ -106,24 +143,23 @@ const EmployeeTable = () => {
     });
   };
 
-
   const handleSaveEdit = async () => {
-  if (editingEmployee) {
-    try {
-      const response = await api.put(`/employee/update/${editingEmployee.id}`, editingEmployee);
-      if (response.status === 200) {
-        getData();
-        handleCloseDialog();
-        alert('更新成功！');
-      } else {
-        alert('更新失敗，請稍後再試');
+    if (editingEmployee) {
+      try {
+        const response = await api.put(`/employee/update/${editingEmployee.id}`, editingEmployee);
+        if (response.status === 200) {
+          getData();
+          handleCloseDialog();
+          alert('更新成功！');
+        } else {
+          alert('更新失敗，請稍後再試');
+        }
+      } catch (error) {
+        console.error('更新失敗:', error);
+        alert('更新過程中出錯');
       }
-    } catch (error) {
-      console.error('更新失敗:', error);
-      alert('更新過程中出錯');
     }
-  }
-};
+  };
 
   return (
     <Box p={4}>
@@ -132,6 +168,7 @@ const EmployeeTable = () => {
         display="flex"
         justifyContent="space-between"
         alignItems="center"
+        gap={2}
       >
         <TextField
           variant="outlined"
@@ -140,12 +177,29 @@ const EmployeeTable = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <Button
+          variant="contained"
+          color="error"
+          onClick={handleBatchDelete}
+          disabled={selectedIds.length === 0}
+        >
+          批量刪除
+        </Button>
       </Box>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={
+                    selectedIds.length > 0 && selectedIds.length < data.length
+                  }
+                  checked={data.length > 0 && selectedIds.length === data.length}
+                  onChange={handleSelectAll}
+                />
+              </TableCell>
               <TableCell>ID</TableCell>
               <TableCell>Username</TableCell>
               <TableCell>Password</TableCell>
@@ -155,7 +209,13 @@ const EmployeeTable = () => {
           </TableHead>
           <TableBody>
             {data.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow key={row.id} hover>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={selectedIds.includes(row.id)}
+                    onChange={() => handleSelectOne(row.id)}
+                  />
+                </TableCell>
                 <TableCell>{row.id}</TableCell>
                 <TableCell>{row.username}</TableCell>
                 <TableCell>{row.password}</TableCell>

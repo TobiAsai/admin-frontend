@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  Checkbox,
   IconButton,
   Paper,
   Table,
@@ -43,6 +44,8 @@ const ArticleTable = () => {
 
   const [editor, setEditor] = useState<any>(null);
 
+  const [selectedIds, setSelectedIds] = useState<number[]>([]); // 新增：選中項目
+
   const toolbarConfig = {};
   const editorConfig = { placeholder: "請輸入文章內容..." };
 
@@ -58,6 +61,7 @@ const ArticleTable = () => {
       const pageData = response.data.data;
       setData(pageData.content);
       setTotalElements(pageData.totalElements);
+      setSelectedIds([]); // 每次載入新資料時清空勾選
     } catch (err) {
       console.error("載入員工資料失敗:", err);
     }
@@ -76,10 +80,9 @@ const ArticleTable = () => {
   };
 
   useEffect(() => {
-    // 在當 componentDidMount 時執行
-    getData(); // 呼叫 getData 函數
-    getClassificationList(); // 呼叫 getClassificationList 函數
-  }, []); // 在 componentDidMount 時執行
+    getData();
+    getClassificationList();
+  }, []);
 
   useEffect(() => {
     getData();
@@ -93,22 +96,64 @@ const ArticleTable = () => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
   const handleDelete = async (id: number) => {
-    const response = await api.delete(`/article/delete/${id}`);
-    if (response.status === 200) {
-      console.log("刪除article資料成功:", response.data);
-      getData();
-      alert("刪除article資料成功"); // 刪除後可以呼叫 API 執行刪除操作
+    if (!window.confirm("確定要刪除這筆文章嗎？")) return;
+    try {
+      const response = await api.delete(`/article/delete/${id}`);
+      if (response.status === 200) {
+        alert("刪除article資料成功");
+        getData();
+      } else {
+        alert("刪除article資料失敗");
+      }
+    } catch (error) {
+      console.error("刪除article資料失敗:", error);
+      alert("刪除過程中發生錯誤");
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) {
+      alert("請先選擇要刪除的文章");
+      return;
+    }
+    if (!window.confirm(`確定刪除選中的 ${selectedIds.length} 篇文章嗎？`)) {
+      return;
+    }
+    try {
+      const response = await api.delete("/article/deleteBatch", {
+        data: selectedIds,
+      });
+      if (response.status === 200) {
+        alert("批量刪除成功！");
+        setSelectedIds([]);
+        getData();
+      } else {
+        alert("批量刪除失敗");
+      }
+    } catch (error) {
+      console.error("批量刪除錯誤:", error);
+      alert("刪除過程發生錯誤");
+    }
+  };
+
+  const handleSelect = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const allIds = data.map((article) => article.id);
+      setSelectedIds(allIds);
     } else {
-      console.error("刪除article資料失敗:", response.data);
-      alert("刪除article資料失敗"); // 刪除後可以呼叫 API 執行刪除操作
+      setSelectedIds([]);
     }
   };
 
@@ -131,11 +176,7 @@ const ArticleTable = () => {
     const { name, value } = e.target;
     setEditingArticle((prev) => {
       if (!prev) return null;
-      const newValue =
-        name === "password"
-          ? (e as React.ChangeEvent<HTMLInputElement>).target.value
-          : value;
-      return { ...prev, [name]: newValue };
+      return { ...prev, [name]: value };
     });
   };
 
@@ -147,8 +188,8 @@ const ArticleTable = () => {
           editingArticle
         );
         if (response.status === 200) {
-          getData();
           alert("更新成功！");
+          getData();
           handleCloseDialog();
         } else {
           alert("更新失敗，請稍後再試");
@@ -176,12 +217,29 @@ const ArticleTable = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <Button
+          variant="contained"
+          color="error"
+          disabled={selectedIds.length === 0}
+          onClick={handleBatchDelete}
+        >
+          批量刪除
+        </Button>
       </Box>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  checked={selectedIds.length > 0 && selectedIds.length === data.length}
+                  indeterminate={
+                    selectedIds.length > 0 && selectedIds.length < data.length
+                  }
+                  onChange={handleSelectAll}
+                />
+              </TableCell>
               <TableCell>ID</TableCell>
               <TableCell>Title</TableCell>
               <TableCell>Content</TableCell>
@@ -193,9 +251,16 @@ const ArticleTable = () => {
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
+
           <TableBody>
             {data.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow key={row.id} hover>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={selectedIds.includes(row.id)}
+                    onChange={() => handleSelect(row.id)}
+                  />
+                </TableCell>
                 <TableCell>{row.id}</TableCell>
                 <TableCell>{row.title}</TableCell>
                 <TableCell
@@ -207,8 +272,7 @@ const ArticleTable = () => {
                   }}
                 >
                   {row.content}
-                </TableCell>{" "}
-                {/* 內容欄位太長可能會爆掉，加個樣式 */}
+                </TableCell>
                 <TableCell>{row.editor}</TableCell>
                 <TableCell>{row.classification}</TableCell>
                 <TableCell>{row.date}</TableCell>
@@ -226,6 +290,7 @@ const ArticleTable = () => {
             ))}
           </TableBody>
         </Table>
+
         <TablePagination
           rowsPerPageOptions={[10, 20, 50]}
           component="div"
@@ -255,18 +320,7 @@ const ArticleTable = () => {
               value={editingArticle?.title || ""}
               onChange={handleEditFormChange}
             />
-            {/* <TextField
-              margin="dense"
-              name="content" // 🌟 新增 content 欄位 🌟
-              label="Content"
-              type="text"
-              fullWidth
-              multiline // 讓內容可以多行輸入
-              rows={4} // 預設顯示 4 行
-              variant="outlined"
-              value={editingArticle?.content || ""}
-              onChange={handleEditFormChange}
-            /> */}
+
             <Box>
               <InputLabel>Content</InputLabel>
               <Toolbar
@@ -293,9 +347,10 @@ const ArticleTable = () => {
                 }}
               />
             </Box>
+
             <TextField
               margin="dense"
-              name="editor" // 🌟 新增 editor 欄位 🌟
+              name="editor"
               label="Editor"
               type="text"
               fullWidth
@@ -303,79 +358,62 @@ const ArticleTable = () => {
               value={editingArticle?.editor || ""}
               onChange={handleEditFormChange}
             />
-            {/* <TextField
-              margin="dense"
-              name="classification" // 🌟 新增 classification 欄位 🌟
-              label="classification"
-              type="text"
-              fullWidth
-              variant="outlined"
-              value={editingArticle?.classification || ""}
-              onChange={handleEditFormChange}
-            /> */}
-            <FormControl fullWidth margin="dense">
-              <InputLabel id="classification-select-label">分類</InputLabel>
+
+            <FormControl fullWidth>
+              <InputLabel id="classification-label">Classification</InputLabel>
               <Select
-                labelId="classification-select-label"
+                labelId="classification-label"
                 name="classification"
                 value={editingArticle?.classification || ""}
-                label="分類"
+                label="Classification"
                 onChange={handleEditFormChange}
               >
-                {/* <MenuItem value={"active"}>Active</MenuItem>
-                <MenuItem value={"inactive"}>Inactive</MenuItem> */}
-                {classificationList.map((item: string) => (
-                  <MenuItem value={item}>{item}</MenuItem>
+                {classificationList.map((c) => (
+                  <MenuItem key={c} value={c}>
+                    {c}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             <TextField
               margin="dense"
-              name="date" // 🌟 新增 date 欄位 🌟
+              name="date"
               label="Date"
-              type="date" // 使用 date 類型 input
+              type="date"
               fullWidth
               variant="outlined"
               value={editingArticle?.date || ""}
               onChange={handleEditFormChange}
-              InputLabelProps={{
-                shrink: true, // 讓日期標籤一直浮起
-              }}
+              InputLabelProps={{ shrink: true }}
             />
+
             <TextField
               margin="dense"
-              name="view" // 🌟 新增 view 欄位 🌟
-              label="View Count"
-              type="number" // 觀看數是數字類型
+              name="view"
+              label="View"
+              type="number"
               fullWidth
               variant="outlined"
-              value={editingArticle?.view || 0} // 預設值為 0
+              value={editingArticle?.view || ""}
               onChange={handleEditFormChange}
             />
-            {/* 🌟 下拉選單區塊結束 🌟 */}
-            <FormControl fullWidth margin="dense">
-              <InputLabel id="state-select-label">狀態</InputLabel>
-              <Select
-                labelId="state-select-label"
-                name="state"
-                value={editingArticle?.state || ""}
-                label="狀態"
-                onChange={handleEditFormChange}
-              >
-                <MenuItem value={"active"}>Active</MenuItem>
-                <MenuItem value={"inactive"}>Inactive</MenuItem>
-              </Select>
-            </FormControl>
+
+            <TextField
+              margin="dense"
+              name="state"
+              label="State"
+              type="text"
+              fullWidth
+              variant="outlined"
+              value={editingArticle?.state || ""}
+              onChange={handleEditFormChange}
+            />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary">
-            取消
-          </Button>
-          <Button onClick={handleSaveEdit} color="primary" variant="contained">
-            儲存
-          </Button>
+          <Button onClick={handleCloseDialog}>取消</Button>
+          <Button onClick={handleSaveEdit}>儲存</Button>
         </DialogActions>
       </Dialog>
     </Box>
