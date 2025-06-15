@@ -63,6 +63,7 @@ const CreatePage = () => {
     if (response.data.code === 200) {
       alert("添加成功！");
       navigate("/main/article");
+      return
     }
     alert("添加失敗！");
   };
@@ -149,7 +150,7 @@ const CreatePage = () => {
           </FormControl>
 
           <Button variant="contained" onClick={handleRegister} fullWidth>
-            註冊
+            新增
           </Button>
         </Box>
       </Paper>

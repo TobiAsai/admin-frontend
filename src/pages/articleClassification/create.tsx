@@ -75,7 +75,7 @@ const CreatePage = () => {
           {/* 🌟 下拉選單區塊結束 🌟 */}
 
           <Button variant="contained" onClick={handleRegister} fullWidth>
-            註冊
+            新增
           </Button>
         </Box>
       </Paper>
