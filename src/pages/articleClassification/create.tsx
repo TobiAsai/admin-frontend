@@ -23,15 +23,16 @@ const CreatePage = () => {
   const navigate = useNavigate();
 
   const handleRegister = async () => {
-    console.log("註冊資料：", registerForm);
+    console.log("添加資料：", registerForm);
     const response = await api.post("/classification/create", registerForm);
-    console.log("註冊資料：", response.data);
-    console.log("註冊資料：", response.data.code);
+    console.log("添加資料：", response.data);
+    console.log("添加資料：", response.data.code);
     if (response.data.code === 200) {
-      alert("註冊成功！");
+      alert("添加成功！");
       navigate("/main/articleClassification");
       return
     }
+    alert("添加失敗！");
     // TODO: 呼叫 API 註冊
   };
 

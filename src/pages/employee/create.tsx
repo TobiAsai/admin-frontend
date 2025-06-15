@@ -33,6 +33,7 @@ const CreatePage = () => {
       navigate("/main/employee");
       return
     }
+    alert("註冊失敗！");
     // TODO: 呼叫 API 註冊
   };
 

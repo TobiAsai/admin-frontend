@@ -21,13 +21,14 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import type { SelectChangeEvent } from '@mui/material/Select';
+import type { SelectChangeEvent } from "@mui/material/Select";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import api from "../../api/axiosInstance"; 
+import api from "../../api/axiosInstance";
 import { Article, Classification } from "../../type/types";
 
-
+import { Editor, Toolbar } from "@wangeditor/editor-for-react";
+import "@wangeditor/editor/dist/css/style.css";
 
 const ArticleTable = () => {
   const [data, setData] = useState<Article[]>([]);
@@ -39,6 +40,11 @@ const ArticleTable = () => {
 
   const [openDialog, setOpenDialog] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+
+  const [editor, setEditor] = useState<any>(null);
+
+  const toolbarConfig = {};
+  const editorConfig = { placeholder: "請輸入文章內容..." };
 
   const getData = async () => {
     try {
@@ -61,13 +67,16 @@ const ArticleTable = () => {
     try {
       const response = await api.get("/classification/findAll");
       const classificationData = response.data.data;
-      setClassificationList(classificationData.content.map((item: Classification) => item.name));
+      setClassificationList(
+        classificationData.content.map((item: Classification) => item.name)
+      );
     } catch (err) {
       console.error("載入分類資料失敗:", err);
     }
   };
 
-  useEffect(() => { // 在當 componentDidMount 時執行
+  useEffect(() => {
+    // 在當 componentDidMount 時執行
     getData(); // 呼叫 getData 函數
     getClassificationList(); // 呼叫 getClassificationList 函數
   }, []); // 在 componentDidMount 時執行
@@ -84,7 +93,9 @@ const ArticleTable = () => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -109,13 +120,21 @@ const ArticleTable = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingArticle(null);
+    window.location.reload();
   };
 
-  const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
+  const handleEditFormChange = (
+    e:
+      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+      | SelectChangeEvent<string>
+  ) => {
     const { name, value } = e.target;
     setEditingArticle((prev) => {
       if (!prev) return null;
-      const newValue = name === 'password' ? (e as React.ChangeEvent<HTMLInputElement>).target.value : value;
+      const newValue =
+        name === "password"
+          ? (e as React.ChangeEvent<HTMLInputElement>).target.value
+          : value;
       return { ...prev, [name]: newValue };
     });
   };
@@ -129,8 +148,8 @@ const ArticleTable = () => {
         );
         if (response.status === 200) {
           getData();
-          handleCloseDialog();
           alert("更新成功！");
+          handleCloseDialog();
         } else {
           alert("更新失敗，請稍後再試");
         }
@@ -139,6 +158,7 @@ const ArticleTable = () => {
         alert("更新過程中出錯");
       }
     }
+    window.location.reload();
   };
 
   return (
@@ -178,7 +198,17 @@ const ArticleTable = () => {
               <TableRow key={row.id}>
                 <TableCell>{row.id}</TableCell>
                 <TableCell>{row.title}</TableCell>
-                <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.content}</TableCell> {/* 內容欄位太長可能會爆掉，加個樣式 */}
+                <TableCell
+                  sx={{
+                    maxWidth: 200,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {row.content}
+                </TableCell>{" "}
+                {/* 內容欄位太長可能會爆掉，加個樣式 */}
                 <TableCell>{row.editor}</TableCell>
                 <TableCell>{row.classification}</TableCell>
                 <TableCell>{row.date}</TableCell>
@@ -210,7 +240,10 @@ const ArticleTable = () => {
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>編輯員工資料</DialogTitle>
         <DialogContent>
-          <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Box
+            component="form"
+            sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}
+          >
             <TextField
               autoFocus
               margin="dense"
@@ -222,7 +255,7 @@ const ArticleTable = () => {
               value={editingArticle?.title || ""}
               onChange={handleEditFormChange}
             />
-            <TextField
+            {/* <TextField
               margin="dense"
               name="content" // 🌟 新增 content 欄位 🌟
               label="Content"
@@ -233,7 +266,33 @@ const ArticleTable = () => {
               variant="outlined"
               value={editingArticle?.content || ""}
               onChange={handleEditFormChange}
-            />
+            /> */}
+            <Box>
+              <InputLabel>Content</InputLabel>
+              <Toolbar
+                editor={editor}
+                defaultConfig={toolbarConfig}
+                mode="default"
+                style={{ borderBottom: "1px solid #ccc" }}
+              />
+              <Editor
+                defaultConfig={editorConfig}
+                value={editingArticle?.content || ""}
+                onCreated={setEditor}
+                onChange={(editor) => {
+                  const html = editor.getHtml();
+                  setEditingArticle((prev) =>
+                    prev ? { ...prev, content: html } : null
+                  );
+                }}
+                mode="default"
+                style={{
+                  height: "200px",
+                  overflowY: "hidden",
+                  border: "1px solid #ccc",
+                }}
+              />
+            </Box>
             <TextField
               margin="dense"
               name="editor" // 🌟 新增 editor 欄位 🌟

@@ -13,6 +13,8 @@
     "@mui/icons-material": "^7",
     "@mui/material": "^7",
     "@toolpad/core": "^0.14.0",
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-react": "^1.0.6",
     "axios": "^1.10.0",
     "draft-js": "^0.11.7",
     "html-to-draftjs": "^1.5.0",
